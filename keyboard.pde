@@ -5,13 +5,14 @@ import ddf.minim.*;
 import processing.serial.*;
 
 int lf = 10;    // Linefeed in ASCII
-String str = "";
+String str = null;
 Serial port;  // Create object from Serial class
 
 int R = 200;  // Radius of the circles.
 int P = 100;  // Padding around the circle.
 int H = P + R;  // Half a circle + padding.
 int C = 2 * H;  // Circle area.
+int T = 100;  // Text area space.
 
 AudioPlayer guitar[];
 AudioPlayer flute[];
@@ -35,33 +36,73 @@ char SHIFT_RIGHT_PEDAL = '\t';  // Tab.
 char SHIFT_TWO_PEDALS = 'x';  // TODO(come up with something useful).
 
 int mode = 0;  // 0 = letters, 1 = uppercase, 2 = punctuation.
+int right_selected = -1;  // The index of the character selected by the right thumb.
+int left_selected = -1;  // The index of the character selected by the left thumb.
+
+String txt = "";
 
 void shift() {
-  if (mode == 1) {
-    mode = 0;
+  if (left_selected == -1) {
+    if (mode == 1) {
+      mode = 0;
+    } else {
+      mode = 1;
+    }
   } else {
-    mode = 1;
+    txt += left[mode][left_selected];
   }
 }
 
 void toggle() {
-  if (mode == 2) {
-    mode = 0;
+  if (right_selected == -1) {
+    if (mode == 2) {
+      mode = 0;
+    } else {
+      mode = 2;
+    }
   } else {
-    mode = 2;
+    txt += right[mode][right_selected];
   }
 }
 
-void drawCircles() {
+void drawCirclesAndText() {
+  // Circles.
   background(240);  // bright gray
-  drawCircle(H, H, R, left[mode]);
-  drawCircle(C + H, H, R, right[mode]);
+  drawCircle(C + H, H, R, right[mode], 0);
+  drawCircle(H, H, R, left[mode], 1);
+  
+  // Text area.
+  fill(255);
+  stroke(255);
+  rect(0, C, 2 * C, H);
+
+  // Text.
+  fill(0);
+  textSize(40);
+  text(txt, T/2, C + T/2 + 20);
 }
 
+// 0 is right, 1 is left.
+void selectAngle(int joystick, float angle) {
+  char characters[] = (joystick == 0 ? right[mode] : left[mode]);
+  int index = Math.round(angle / 360 * characters.length);
+  if (joystick == 0) {
+    right_selected = index;
+  } else {
+    left_selected = index;
+  }
+}
+void deselect(int joystick) {
+  if (joystick == 0) {
+    right_selected = -1;
+  } else {
+    left_selected = -1;
+  }
+}
 
 void setup() 
 {
-  size(2 * C, C);
+  size(2 * C, C + T);
   
   smooth();
   
@@ -74,7 +115,8 @@ void setup()
   }
 }
 
-void drawCircle(int x, int y, int r, char[] characters) {
+// circleIndex = 0 for right, and 1 for left.
+void drawCircle(int x, int y, int r, char[] characters, int circleIndex) {
   stroke(200);
   fill(255);
   ellipse(x, y, 2 * r, 2 * r);
@@ -84,6 +126,10 @@ void drawCircle(int x, int y, int r, char[] characters) {
 
     fill(0);
     textSize(20);
+    if ((right_selected == i && circleIndex == 0) || (left_selected == i && circleIndex == 1)) {
+      fill(222, 0, 0);
+      textSize(40);
+    }
     text(characters[i], 
          x + r * cos(angle) - 5,
          y - r * sin(angle) + 5);
@@ -93,7 +139,8 @@ void drawCircle(int x, int y, int r, char[] characters) {
 int time = 0;
 void draw() {
   // frameRate(20);
-  drawCircles();
+  drawCirclesAndText();
+  selectAngle(0, 50);
   if (time == 300) {
     shift();
   }
