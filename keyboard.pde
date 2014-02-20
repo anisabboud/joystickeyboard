@@ -1,6 +1,7 @@
 /*
  * Joystickboard
  */
+import ddf.minim.*;
 import processing.serial.*;
 
 int lf = 10;    // Linefeed in ASCII
@@ -12,7 +13,10 @@ int P = 100;  // Padding around the circle.
 int H = P + R;  // Half a circle + padding.
 int C = 2 * H;  // Circle area.
 
-// http://mdickens.me/typing/letter_frequency.htm 
+AudioPlayer guitar[];
+AudioPlayer flute[];
+Minim minim;//audio context
+int NOTES = 16;
 
 // 1. Default.
 char right[][] = {{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'},
@@ -60,6 +64,14 @@ void setup()
   size(2 * C, C);
   
   smooth();
+  
+  minim = new Minim(this);
+  guitar = new AudioPlayer[NOTES];
+  flute = new AudioPlayer[NOTES];
+  for (int i = 0; i < NOTES; i++) {
+    guitar[i] = minim.loadFile("guitar/" + i + ".mp3");
+    flute[i] = minim.loadFile("flute/" + i + ".mp3");
+  }
 }
 
 void drawCircle(int x, int y, int r, char[] characters) {
@@ -69,7 +81,7 @@ void drawCircle(int x, int y, int r, char[] characters) {
 
   for (int i = 0; i < characters.length; i++) {
     float angle = radians(i * 360 / characters.length);
-    
+
     fill(0);
     textSize(20);
     text(characters[i], 
@@ -80,6 +92,7 @@ void drawCircle(int x, int y, int r, char[] characters) {
 
 int time = 0;
 void draw() {
+  // frameRate(20);
   drawCircles();
   if (time == 300) {
     shift();
@@ -92,12 +105,9 @@ void draw() {
   }
   time++;
   
-//  background(240);  // bright gray
-//
-//  drawCircle(H, H, R, left[0]);
-//  drawCircle(C + H, H, R, right[0]);
-//  drawCircle(H, C + H, R, left[1]);
-//  drawCircle(C + H, C + H, R, right[1]);
-//  drawCircle(H, 2 * C + H, R, left[2]);
-//  drawCircle(C + H, 2 * C + H, R, right[2]);
+  if (time % 30 == 0) {
+    int note = int(random(NOTES));
+    guitar[note].rewind();
+    guitar[note].play();
+  }
 }
