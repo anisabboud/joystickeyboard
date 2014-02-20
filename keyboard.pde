@@ -5,7 +5,7 @@ import ddf.minim.*;
 import processing.serial.*;
 
 int lf = 10;    // Linefeed in ASCII
-String str = null;
+String str = "";
 Serial port;  // Create object from Serial class
 
 int R = 200;  // Radius of the circles.
