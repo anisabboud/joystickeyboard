@@ -17,10 +17,12 @@ Serial port;  // Create object from Serial class
 // a[3] = left y
 // d[0] = right select
 // d[1] = left select
+// d[2] = right pedal (space)
+// d[3] = left pedal (backspace)
 int a[], d[];
 // analog is between 0 and 1023; scaledA is between -1 and 1.
 float scaledA[];
-boolean toggle_pressed, shift_pressed;
+boolean toggle_pressed, shift_pressed, space_pressed, backspace_pressed;
 float leftTheta, rightTheta, leftR, rightR;
 
 // Drawing stuff.
@@ -58,6 +60,14 @@ int left_selected = -1;  // The index of the character selected by the left thum
 
 String txt = "";
 
+void toggle() {
+  if (mode == 2) {
+    mode = 0;
+  } else {
+    mode = 2;
+  }
+}
+
 void shift() {
   if (mode == 1) {
     mode = 0;
@@ -66,11 +76,13 @@ void shift() {
   }
 }
 
-void toggle() {
-  if (mode == 2) {
-    mode = 0;
-  } else {
-    mode = 2;
+void space() {
+  txt += " ";
+}
+
+void backspace() {
+  if (txt.length() > 0) {
+    txt = txt.substring(0, txt.length() - 1);
   }
 }
 
@@ -135,7 +147,7 @@ void setup()
   
   a = new int[4];
   scaledA = new float[4];
-  d = new int[2];
+  d = new int[4];
 }
 
 // circleIndex = 0 for right, and 1 for left.
@@ -174,6 +186,17 @@ void draw() {
   }
   shift_pressed = (d[1] == 0);
   
+  if (d[2] == 1 && !space_pressed) {  // Was released, now pressed.
+    space();
+  }
+  space_pressed = (d[2] == 1);
+  
+  if (d[3] == 1 && !backspace_pressed) {  // Was released, now pressed.
+    backspace();
+  }
+  backspace_pressed = (d[3] == 1);
+  
+  
   // frameRate(20);
   drawCirclesAndText();
   if (rightR > 0.5) {
@@ -206,7 +229,7 @@ void readInput() {
     str = port.readStringUntil(lf);
     
     if (str != null) {
-      print(str);  // Serial monitor functionality.
+      //print(str);  // Serial monitor functionality.
     }
     
     if (str == null || str.indexOf("OSCILLOSCOPE:") == -1) {
