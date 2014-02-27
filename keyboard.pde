@@ -4,6 +4,8 @@
 import ddf.minim.*;
 import processing.serial.*;
 
+boolean MUSIC_MODE = true;
+
 // Reading from serial stuff.
 // ==========================
 
@@ -17,8 +19,8 @@ Serial port;  // Create object from Serial class
 // a[3] = left y
 // d[0] = right select
 // d[1] = left select
-// d[2] = right pedal (space)
-// d[3] = left pedal (backspace)
+// d[2] = right pedal (space/cymbal)
+// d[3] = left pedal (backspace/bass drum)
 int a[], d[];
 // analog is between 0 and 1023; scaledA is between -1 and 1.
 float scaledA[];
@@ -33,26 +35,31 @@ int H = P + R;  // Half a circle + padding.
 int C = 2 * H;  // Circle area.
 int T = 100;  // Text area space.
 
-AudioPlayer guitar[];
-AudioPlayer flute[];
+int instrument = 0;
+int NUM_INSTRUMENTS = 5;
+String instruments[] = {"flute", "guitar", "oboe", "saxophone", "violin"};
+PImage bgs[];
+AudioPlayer notes[][];
 Minim minim;//audio context
-int NOTES = 16;
+int NUM_NOTES = 16;
+String right_notes[][] = {{"A4", "B4", "C4", "D4", "E4", "F4", "G4", "G#4"},     // flute
+                          {"G#3", "A4", "B4", "C4", "D4", "E4", "F4", "G4"},     // guitar
+                          {"A4", "B4", "C4", "D4", "E4", "F4", "G4", "G#4"},     // oboe
+                          {"A4", "B4", "C4", "C#4", "D4", "F4", "G4", "G#4"},    // saxophone
+                          {"G3", "A#4", "B4", "C4", "D4", "D#4", "F#4", "G#4"}}; // violin
+String left_notes[][] = {{"A5", "B5", "C5", "D5", "E5", "F5", "G5", "A6"},       // flute
+                         {"G#4", "B5", "C5", "D5", "D#5", "E5", "G5", "G#5"},    // guitar
+                         {"A5", "B5", "C5", "D5", "E5", "F5", "G5", "G#5"},      // oboe
+                         {"A5", "B5", "C5", "D5", "E5", "F5", "G5", "G#5"},      // saxophone
+                         {"A5", "A#5", "B5", "D5", "E5", "F#5", "G5", "G#5"}};   // violin
 
 // 1. Default.
-char right[][] = {{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'},
-                  {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'},
-                  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '=', '`', '~', '\\', '|'}};
-char left[][] = {{'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', ',', '.', '\'', '"', '/', '-'},
-                 {'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ',', '.', ';', ':', '?', '_'},
-                 {'!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '[', ']', '{', '}', '<', '>'}};
-
-char LEFT_PEDAL = '\b';  // Backspace.
-char RIGHT_PEDAL = ' ';  // Space.
-char TWO_PEDALS = '\n';  // Enter.
-
-char SHIFT_LEFT_PEDAL = 'x';  // TODO(delete word).
-char SHIFT_RIGHT_PEDAL = '\t';  // Tab.
-char SHIFT_TWO_PEDALS = 'x';  // TODO(come up with something useful).
+String right[][] = {{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"},
+                    {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"},
+                    {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "=", "`", "~", "\\", "|"}};
+String left[][] = {{"q", "r", "s", "t", "u", "v", "w", "x", "y", "z", ",", ".", "'", "\"", "/", "-"},
+                   {"Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", ",", ".", ";", ":", "?", "_"},
+                   {"!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "[", "]", "{", "}", "<", ">"}};
 
 int mode = 0;  // 0 = letters, 1 = uppercase, 2 = punctuation.
 int right_selected = -1;  // The index of the character selected by the right thumb.
@@ -61,18 +68,27 @@ int left_selected = -1;  // The index of the character selected by the left thum
 String txt = "";
 
 void toggle() {
-  if (mode == 2) {
-    mode = 0;
+  if (MUSIC_MODE) {
+    instrument = (instrument + 1) % NUM_INSTRUMENTS;
   } else {
-    mode = 2;
+    if (mode == 2) {
+      mode = 0;
+    } else {
+      mode = 2;
+    }
   }
 }
 
 void shift() {
-  if (mode == 1) {
-    mode = 0;
+  if (MUSIC_MODE) {
+    // Modulo in Java can be negative.
+    instrument = (instrument - 1 + NUM_INSTRUMENTS) % NUM_INSTRUMENTS;
   } else {
-    mode = 1;
+    if (mode == 1) {
+      mode = 0;
+    } else {
+      mode = 1;
+    }
   }
 }
 
@@ -103,16 +119,38 @@ void drawCirclesAndText() {
   text(txt, T/2, C + T/2 + 20);
 }
 
+void drawCirclesAndNotes() {
+  // Circles.
+  background(bgs[instrument]);
+  drawCircle(C + H, H, R, right_notes[instrument], 0);
+  drawCircle(H, H, R, left_notes[instrument], 1);
+
+  // Text.
+  fill(0, 230, 230);
+  textSize(40);
+  text(instruments[instrument], T/2, C + T/2 + 20);
+}
+  
+
 // 0 is right, 1 is left.
 void selectAngle(int joystick, float angle) {
   if (angle < 0) {
     angle += 2 * PI;
   }
-  char characters[] = (joystick == 0 ? right[mode] : left[mode]);
+  String characters[] = MUSIC_MODE ? (joystick == 0 ? right_notes[instrument] : left_notes[instrument])
+                                   : (joystick == 0 ? right[mode] : left[mode]);
   int index = Math.round(angle / (2 * PI) * characters.length) % characters.length;
   if (joystick == 0) {
+    if (MUSIC_MODE && right_selected != index) {
+      notes[instrument][index].rewind();
+      notes[instrument][index].play();
+    }
     right_selected = index;
   } else {
+    if (MUSIC_MODE && left_selected != index) {
+      notes[instrument][index + NUM_NOTES / 2].rewind();
+      notes[instrument][index + NUM_NOTES / 2].play();
+    }
     left_selected = index;
   }
 }
@@ -131,11 +169,13 @@ void setup()
   smooth();
 
   minim = new Minim(this);
-  guitar = new AudioPlayer[NOTES];
-  flute = new AudioPlayer[NOTES];
-  for (int i = 0; i < NOTES; i++) {
-    guitar[i] = minim.loadFile("guitar/" + i + ".mp3");
-    flute[i] = minim.loadFile("flute/" + i + ".mp3");
+  notes = new AudioPlayer[NUM_INSTRUMENTS][NUM_NOTES];
+  bgs = new PImage[NUM_INSTRUMENTS];
+  for (int i = 0; i < NUM_INSTRUMENTS; i++) {
+    bgs[i] = loadImage(instruments[i] + "/img.jpg");
+    for (int j = 0; j < NUM_NOTES; j++) {
+      notes[i][j] = minim.loadFile(instruments[i] + "/" + j + ".mp3");
+    }
   }
   
   port = new Serial(this, Serial.list()[0], 9600);
@@ -151,15 +191,19 @@ void setup()
 }
 
 // circleIndex = 0 for right, and 1 for left.
-void drawCircle(int x, int y, int r, char[] characters, int circleIndex) {
+void drawCircle(int x, int y, int r, String[] characters, int circleIndex) {
   stroke(200);
-  fill(255);
+  if (MUSIC_MODE) {
+    fill(255, 255, 255, 0);
+  } else {
+    fill(255);
+  }
   ellipse(x, y, 2 * r, 2 * r);
 
   for (int i = 0; i < characters.length; i++) {
     float angle = radians(i * 360 / characters.length);
 
-    fill(0);
+    fill(MUSIC_MODE ? 240 : 0);
     textSize(20);
     if ((right_selected == i && circleIndex == 0) || (left_selected == i && circleIndex == 1)) {
       fill(222, 0, 0);
@@ -198,12 +242,19 @@ void draw() {
   
   
   // frameRate(20);
-  drawCirclesAndText();
+  if (MUSIC_MODE) {
+    drawCirclesAndNotes();
+  } else {
+    drawCirclesAndText();
+  }
+
   if (rightR > 0.5) {
     selectAngle(0, rightTheta);
   } else {
     if (right_selected != -1) {
-      txt += right[mode][right_selected];
+      if (!MUSIC_MODE) {
+        txt += right[mode][right_selected];
+      }
     }
     right_selected = -1;
   }
@@ -211,17 +262,19 @@ void draw() {
     selectAngle(1, leftTheta);
   } else {
     if (left_selected != -1) {
-      txt += left[mode][left_selected];
+      if (!MUSIC_MODE) {
+        txt += left[mode][left_selected];
+      }
     }
     left_selected = -1;
   }
   time++;
   
-  if (time % 30 == 0) {
-    int note = int(random(NOTES));
-    guitar[note].rewind();
-    guitar[note].play();
-  }
+//  if (time % 30 == 0) {
+//    int note = int(random(NUM_NOTES));
+//    notes[instrument][note].rewind();
+//    notes[instrument][note].play();
+//  }
 }
 
 void readInput() {
