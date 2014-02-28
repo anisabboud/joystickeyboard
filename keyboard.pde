@@ -1,10 +1,10 @@
 /*
- * Joystickboard
+ * Joytunes / Joystickboard
  */
 import ddf.minim.*;
 import processing.serial.*;
 
-boolean MUSIC_MODE = true;
+boolean MUSIC_MODE = false;
 
 // Reading from serial stuff.
 // ==========================
@@ -52,6 +52,9 @@ String left_notes[][] = {{"A5", "B5", "C5", "D5", "E5", "F5", "G5", "A6"},      
                          {"A5", "B5", "C5", "D5", "E5", "F5", "G5", "G#5"},      // oboe
                          {"A5", "B5", "C5", "D5", "E5", "F5", "G5", "G#5"},      // saxophone
                          {"A5", "A#5", "B5", "D5", "E5", "F#5", "G5", "G#5"}};   // violin
+String BASS = "percussion/bass-drum.mp3";
+String CYMBAL = "percussion/cymbal.mp3";
+AudioPlayer bass, cymbal;
 
 // 1. Default.
 String right[][] = {{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"},
@@ -93,12 +96,22 @@ void shift() {
 }
 
 void space() {
-  txt += " ";
+  if (MUSIC_MODE) {
+    bass.rewind();
+    bass.play();
+  } else {
+    txt += " ";
+  }
 }
 
 void backspace() {
-  if (txt.length() > 0) {
-    txt = txt.substring(0, txt.length() - 1);
+  if (MUSIC_MODE) {
+    cymbal.rewind();
+    cymbal.play();
+  } else {
+    if (txt.length() > 0) {
+      txt = txt.substring(0, txt.length() - 1);
+    }
   }
 }
 
@@ -140,6 +153,10 @@ void selectAngle(int joystick, float angle) {
   String characters[] = MUSIC_MODE ? (joystick == 0 ? right_notes[instrument] : left_notes[instrument])
                                    : (joystick == 0 ? right[mode] : left[mode]);
   int index = Math.round(angle / (2 * PI) * characters.length) % characters.length;
+  if (MUSIC_MODE) {
+    int tempIndex = round(angle / (2 * PI) * 12) % 12;
+    index = (tempIndex % 3 == 0) ? (tempIndex * 2 / 3) : (tempIndex / 3 * 2 + 1);
+  }
   if (joystick == 0) {
     if (MUSIC_MODE && right_selected != index) {
       notes[instrument][index].rewind();
@@ -177,6 +194,8 @@ void setup()
       notes[i][j] = minim.loadFile(instruments[i] + "/" + j + ".mp3");
     }
   }
+  bass = minim.loadFile(BASS);
+  cymbal = minim.loadFile(CYMBAL);
   
   port = new Serial(this, Serial.list()[0], 9600);
   port.clear();
@@ -248,7 +267,7 @@ void draw() {
     drawCirclesAndText();
   }
 
-  if (rightR > 0.5) {
+  if (rightR > 0.9) {
     selectAngle(0, rightTheta);
   } else {
     if (right_selected != -1) {
@@ -258,7 +277,7 @@ void draw() {
     }
     right_selected = -1;
   }
-  if (leftR > 0.5) {
+  if (leftR > 0.9) {
     selectAngle(1, leftTheta);
   } else {
     if (left_selected != -1) {
